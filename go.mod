@@ -1,4 +1,4 @@
-module dockerhubmirror
+module github.com/greboid/dockermirror
 
 go 1.14
 
