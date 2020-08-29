@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"github.com/google/go-containerregistry/pkg/authn"
@@ -8,8 +9,11 @@ import (
 	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/kouhin/envflag"
 	"gopkg.in/yaml.v3"
+	"io/ioutil"
 	"log"
+	"net/http"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -46,6 +50,63 @@ func main() {
 	}
 }
 
+func (m *Mirror) getDockerHubRepos(namespace string) ([]string, error) {
+	username, password := m.ResolveString("hub.docker.com")
+	resp, err := http.Post("https://hub.docker.com/v2/users/login/", "application/json",
+		strings.NewReader(fmt.Sprintf("{\"username\": \"%s\", \"password\": \"%s\"}", username, password)))
+	if err != nil {
+		return nil, err
+	}
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	hubLoginResponse := &HubLoginResponse{}
+	err = json.Unmarshal(body, hubLoginResponse)
+	if err != nil {
+		return nil, err
+	}
+	req, err := http.NewRequest("GET", fmt.Sprintf("https://hub.docker.com/v2/repositories/%s/?page_size=1000", namespace), nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-type", "application/json")
+	req.Header.Set("Authorization", fmt.Sprintf("JWT %s", hubLoginResponse.Token))
+	client := http.Client{}
+	resp, err = client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	body, err = ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	repos := &HubRepositoriesResponse{}
+	err = json.Unmarshal(body, repos)
+	if err != nil {
+		return nil, err
+	}
+	images := make([]string,0)
+	for index := range repos.Images {
+		images = append(images, fmt.Sprintf("%s/%s", repos.Images[index].Namespace, repos.Images[index].Name))
+	}
+	return images, nil
+}
+
+type HubLoginResponse struct {
+	Token string `json:"token"`
+	Message string `json:"message"`
+}
+
+type HubRepositoriesResponse struct {
+	Count int `json:"count"`
+	Images []struct {
+		User string `json:"user"`
+		Name string `json:"name"`
+		Namespace string `json:"namespace"`
+	} `json:"results"`
+}
+
 type Mirror struct {
 	Images         []Image
 	Registries     map[string]Registry
@@ -69,23 +130,25 @@ func (m *Mirror) mirrorRepos() {
 }
 
 func (m *Mirror) Resolve(resource authn.Resource) (authn.Authenticator, error) {
+	username, password := m.ResolveString(resource.RegistryStr())
+	return authn.FromConfig(authn.AuthConfig{
+		Username: username,
+		Password: password,
+	}), nil
+}
+
+func (m *Mirror) ResolveString(resource string) (string, string) {
 	var value Registry
 	var ok bool
-	if resource.RegistryStr() == name.DefaultRegistry {
+	if resource == name.DefaultRegistry {
 		value, ok = m.Registries["hub.docker.com"]
 	} else {
-		value, ok = m.Registries[resource.RegistryStr()]
+		value, ok = m.Registries[resource]
 	}
 	if !ok {
-		return authn.FromConfig(authn.AuthConfig{
-			Username: "",
-			Password: "",
-		}), nil
+		return  "", ""
 	}
-	return authn.FromConfig(authn.AuthConfig{
-		Username: value.Username,
-		Password: value.Password,
-	}), nil
+	return value.Username, value.Password
 }
 
 type Config struct {
@@ -101,11 +164,6 @@ type Registry struct {
 type Image struct {
 	From string `yaml:"from"`
 	To   string `yaml:"to"`
-}
-
-type ReferenceImage struct {
-	From name.Reference
-	To   name.Reference
 }
 
 func parseConfig(configPath string) (*Config, error) {
