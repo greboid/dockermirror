@@ -50,6 +50,18 @@ func main() {
 	}
 }
 
+func (m *Mirror) getRegistryRepos(registry string) ([]string, error) {
+	repos, err := crane.Catalog(registry)
+	if err != nil {
+		return nil, err
+	}
+	namedSpacesRepos := make([]string, 0)
+	for index := range repos {
+		namedSpacesRepos = append(namedSpacesRepos, fmt.Sprintf("%s/%s", registry, repos[index]))
+	}
+	return namedSpacesRepos, nil
+}
+
 func (m *Mirror) getDockerHubRepos(namespace string) ([]string, error) {
 	username, password := m.ResolveString("hub.docker.com")
 	resp, err := http.Post("https://hub.docker.com/v2/users/login/", "application/json",
