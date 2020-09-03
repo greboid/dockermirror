@@ -45,11 +45,14 @@ docker cli.
 images:
   - from: <source image>
     to: <destination image>
+mirrors:
+  - from: hub.docker.com
+    to: <custom repository>
 registries:
   hub.docker.com:
     username: "exampleUsername"
     password: "examplePassword"
-  <custom repository>>:
+  <custom repository>:
     username: "exampleUsername"
     password: "examplePassword"
 ```
