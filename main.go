@@ -60,7 +60,7 @@ func main() {
 func (m *DockerMirror) getMirrorRegistries(registries []Mirror) ([]Image, error) {
 	repos := make([]Image, 0)
 	for index := range registries {
-		newRepos, err := m.getMirrorRegistry(registries[index].From, registries[index].To, "")
+		newRepos, err := m.getMirrorRegistry(registries[index].From, registries[index].To, registries[index].Namespace)
 		if err == nil {
 			repos = append(repos, newRepos...)
 		}
@@ -78,9 +78,13 @@ func (m *DockerMirror) getMirrorRegistry(source string, dest string, namespace s
 		sourceRegistry := repos[repoIndex].Context().RegistryStr()
 		repoName := strings.TrimPrefix(repos[repoIndex].Context().Name(), repos[repoIndex].Context().RegistryStr()+"/")
 		tag := repos[repoIndex].Identifier()
+		destRepo := repoName
+		if namespace != "" {
+			destRepo = fmt.Sprintf("%s/%s", namespace, repoName)
+		}
 		mirrors = append(mirrors, Image{
 			From: fmt.Sprintf("%s/%s:%s", sourceRegistry, repoName, tag),
-			To:   fmt.Sprintf("%s/%s:%s", dest, repoName, tag),
+			To:   fmt.Sprintf("%s/%s:%s", dest, destRepo, tag),
 		})
 	}
 	return mirrors, nil
@@ -241,8 +245,9 @@ type Image struct {
 }
 
 type Mirror struct {
-	From string `yaml:"from"`
-	To   string `yaml:"to"`
+	From      string `yaml:"from"`
+	To        string `yaml:"to"`
+	Namespace string `yaml:"namespace"`
 }
 
 func parseConfig(configPath string) (*Config, error) {

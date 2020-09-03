@@ -48,6 +48,7 @@ images:
 mirrors:
   - from: hub.docker.com
     to: <custom repository>
+    namespace: <option prefix, will have / appended automatically>
 registries:
   hub.docker.com:
     username: "exampleUsername"
