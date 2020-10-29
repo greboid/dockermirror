@@ -53,7 +53,6 @@ func main() {
 	}
 	for {
 		m.mirrorRepos(m.Images)
-		time.Sleep(*duration)
 	}
 }
 
@@ -190,7 +189,8 @@ type DockerMirror struct {
 }
 
 func (m *DockerMirror) mirrorRepos(images []Image) {
-	log.Printf("Starting to mirror %d images", len(images))
+	total := len(images)
+	log.Printf("Starting to mirror %d images", total)
 	failed := 0
 	success := 0
 	for repo := range images {
@@ -202,6 +202,7 @@ func (m *DockerMirror) mirrorRepos(images []Image) {
 			success++
 			log.Printf("mirror %s to %s success", images[repo].From, images[repo].To)
 		}
+		time.Sleep(time.Duration(int(duration.Seconds()) / total) * time.Second)
 	}
 	log.Printf("Finished mirroring, %d suceeded, %d failed", success, failed)
 }
