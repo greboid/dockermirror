@@ -58,7 +58,7 @@ func main() {
 	if len(m.Images) == 0 {
 		log.Fatalf("No images to mirror, exiting.")
 	}
-	if *duration < time.Minute {
+	if *duration < time.Minute && len(*limit) == 0 {
 		m.mirrorRepos(m.Images)
 		return
 	}
