@@ -1,27 +1,31 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
-	"github.com/google/go-containerregistry/pkg/authn"
-	"github.com/google/go-containerregistry/pkg/crane"
-	"github.com/google/go-containerregistry/pkg/name"
-	"github.com/kouhin/envflag"
-	"gopkg.in/yaml.v3"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"time"
+
+	"github.com/google/go-containerregistry/pkg/authn"
+	"github.com/google/go-containerregistry/pkg/crane"
+	"github.com/google/go-containerregistry/pkg/name"
+	"github.com/kouhin/envflag"
+	"golang.org/x/time/rate"
+	"gopkg.in/yaml.v3"
 )
 
 var (
-	configLocation = flag.String("config", "/config.yml",
-		"Specifies the location of the config file")
-	duration = flag.Duration("duration", 0, "Number of seconds between executions")
+	configLocation = flag.String("config", "/config.yml", "Specifies the location of the config file")
+	duration       = flag.Duration("duration", 0, "Number of seconds between executions")
+	limit          = flag.String("rate-limit", "", "The rate at which we mirror images")
 )
 
 func main() {
@@ -33,11 +37,17 @@ func main() {
 	if err != nil {
 		log.Fatalf("unable to load the config file: %s", err.Error())
 	}
+	parsedLimit, err := parseRate(*limit)
+	if err != nil {
+		log.Fatalf("Unable to parse rate limit %s", err.Error())
+	}
 	m := &DockerMirror{
 		Images:     config.Images,
 		Registries: config.Registries,
 		Mirrors:    config.Mirrors,
+		Limiter:    rate.NewLimiter(parsedLimit, 1),
 	}
+	m.Limiter.Limit()
 	authn.DefaultKeychain = m
 	reposToMirror, err := m.getMirrorRegistries(m.Mirrors)
 	if err != nil {
@@ -53,7 +63,28 @@ func main() {
 	}
 	for {
 		m.mirrorRepos(m.Images)
+		time.Sleep(*duration)
 	}
+}
+
+func parseRate(rateDescription string) (rate.Limit, error) {
+	if len(rateDescription) == 0 {
+		return rate.Inf, nil
+	}
+	parts := strings.Split(rateDescription, "/")
+	if len(parts) != 2 {
+		return -1, fmt.Errorf("unable to parse rate")
+	}
+	num, err := strconv.Atoi(parts[0])
+	if err != nil {
+		return -1, err
+	}
+	duration, err := time.ParseDuration(parts[1])
+	if err != nil {
+		return -1, err
+	}
+	limit := rate.Limit(float64(num) / duration.Seconds())
+	return limit, nil
 }
 
 func (m *DockerMirror) getMirrorRegistries(registries []Mirror) ([]Image, error) {
@@ -186,6 +217,7 @@ type DockerMirror struct {
 	Images     []Image
 	Registries map[string]Registry
 	Mirrors    []Mirror
+	Limiter    *rate.Limiter
 }
 
 func (m *DockerMirror) mirrorRepos(images []Image) {
@@ -194,7 +226,11 @@ func (m *DockerMirror) mirrorRepos(images []Image) {
 	failed := 0
 	success := 0
 	for repo := range images {
-		err := crane.Copy(images[repo].From, images[repo].To)
+		err := m.Limiter.Wait(context.Background())
+		if err != nil {
+			log.Fatalf("Rate limiter error: %s", err.Error())
+		}
+		err = crane.Copy(images[repo].From, images[repo].To)
 		if err != nil {
 			failed++
 			log.Printf("mirror %s to %s failed: %s", images[repo].From, images[repo].To, err.Error())
@@ -202,7 +238,6 @@ func (m *DockerMirror) mirrorRepos(images []Image) {
 			success++
 			log.Printf("mirror %s to %s success", images[repo].From, images[repo].To)
 		}
-		time.Sleep(time.Duration(int(duration.Seconds()) / total) * time.Second)
 	}
 	log.Printf("Finished mirroring, %d suceeded, %d failed", success, failed)
 }
