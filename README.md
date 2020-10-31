@@ -14,11 +14,14 @@ services:
     image: greboid/dockermirror
     environment:
       CONFIG: /config.yml
-      DURATION: 6h
+      DURATION: 24h
+      RATE_LIMIT: 100/6h
     volumes:
       - <local path to config.yml>:/config.yml
     restart: always
 ```
+
+Arguments could also just be passed in the command for the image instead, similar to running from the CLI
 
 ## Basic CLI Usage
 
@@ -31,8 +34,13 @@ go install github.com/greboid/dockermirror
 ```
   dockermirror \
     --config [path to config.yml file]  \
-    --duration [repeat every X duration]
+    --duration [repeat every X duration] \
+    --rate-limit [rate limit, see below]
 ```
+
+##Rate Limit
+The rate limit as "X/Y" where X is the number of images to pull and Y is a [go duration string](https://golang.org/pkg/time/#ParseDuration), 
+this is converted to a number per second and used as a rate limit, this can help avoid failures caused by docker hub rate limiting.
 
 ## Config Format
 
