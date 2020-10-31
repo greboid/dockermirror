@@ -7,7 +7,6 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"os"
 	"strconv"
@@ -17,6 +16,7 @@ import (
 	"github.com/google/go-containerregistry/pkg/authn"
 	"github.com/google/go-containerregistry/pkg/crane"
 	"github.com/google/go-containerregistry/pkg/name"
+	"github.com/greboid/go-log"
 	"github.com/kouhin/envflag"
 	"golang.org/x/time/rate"
 	"gopkg.in/yaml.v3"
@@ -26,6 +26,7 @@ var (
 	configLocation = flag.String("config", "/config.yml", "Specifies the location of the config file")
 	duration       = flag.Duration("duration", 0, "Number of seconds between executions")
 	limit          = flag.String("rate-limit", "", "The rate at which we mirror images")
+	log            = logger.MustCreateLogger(false)
 )
 
 func main() {
@@ -51,7 +52,7 @@ func main() {
 	authn.DefaultKeychain = m
 	reposToMirror, err := m.getMirrorRegistries(m.Mirrors)
 	if err != nil {
-		log.Printf("Unable to get repos from registries to mirrow")
+		log.Errorf("Unable to get repos from registries to mirror")
 	}
 	m.Images = append(m.Images, reposToMirror...)
 	if len(m.Images) == 0 {
@@ -102,7 +103,7 @@ func (m *DockerMirror) getMirrorRegistry(source string, dest string, namespace s
 	mirrors := make([]Image, 0)
 	repos, err := m.getRepos(source)
 	if err != nil {
-		log.Fatalf("error parsing mirror registry '%s': %s", source, err.Error())
+		log.Fatalf("Error parsing mirror registry '%s': %s", source, err.Error())
 	}
 	for repoIndex := range repos {
 		sourceRegistry := repos[repoIndex].Context().RegistryStr()
@@ -222,7 +223,7 @@ type DockerMirror struct {
 
 func (m *DockerMirror) mirrorRepos(images []Image) {
 	total := len(images)
-	log.Printf("Starting to mirror %d images", total)
+	log.Infof("Starting to mirror %d images", total)
 	failed := 0
 	success := 0
 	for repo := range images {
@@ -233,13 +234,13 @@ func (m *DockerMirror) mirrorRepos(images []Image) {
 		err = crane.Copy(images[repo].From, images[repo].To)
 		if err != nil {
 			failed++
-			log.Printf("mirror %s to %s failed: %s", images[repo].From, images[repo].To, err.Error())
+			log.Errorf("Failed to mirror %s to %s: %s", images[repo].From, images[repo].To, err.Error())
 		} else {
 			success++
-			log.Printf("mirror %s to %s success", images[repo].From, images[repo].To)
+			log.Infof("Succeeded to mirror %s to %s", images[repo].From, images[repo].To)
 		}
 	}
-	log.Printf("Finished mirroring, %d suceeded, %d failed", success, failed)
+	log.Infof("Finished mirroring, %d succeeded, %d failed", success, failed)
 }
 
 func (m *DockerMirror) Resolve(resource authn.Resource) (authn.Authenticator, error) {
