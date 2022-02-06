@@ -13,13 +13,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/csmith/envflag"
 	"github.com/google/go-containerregistry/pkg/authn"
 	"github.com/google/go-containerregistry/pkg/crane"
 	"github.com/google/go-containerregistry/pkg/name"
-	"github.com/greboid/go-log"
-	"github.com/kouhin/envflag"
+	"github.com/greboid/golog"
 	"golang.org/x/time/rate"
-	"gopkg.in/yaml.v3"
+	"gopkg.in/yaml.v2"
 )
 
 var (
@@ -30,10 +30,7 @@ var (
 )
 
 func main() {
-	err := envflag.Parse()
-	if err != nil {
-		log.Fatalf("unable to parse config location: %s", err.Error())
-	}
+	envflag.Parse()
 	config, err := parseConfig(*configLocation)
 	if err != nil {
 		log.Fatalf("unable to load the config file: %s", err.Error())
