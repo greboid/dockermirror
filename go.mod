@@ -4,7 +4,7 @@ go 1.17
 
 require (
 	github.com/csmith/envflag v1.0.0
-	github.com/google/go-containerregistry v0.9.0
+	github.com/google/go-containerregistry v0.10.0
 	github.com/greboid/golog v1.0.3
 	golang.org/x/time v0.0.0-20211116232009-f0f3c7e86c11
 	gopkg.in/yaml.v2 v2.4.0
@@ -27,5 +27,5 @@ require (
 	go.uber.org/multierr v1.7.0 // indirect
 	go.uber.org/zap v1.21.0 // indirect
 	golang.org/x/sync v0.0.0-20220513210516-0976fa681c29 // indirect
-	golang.org/x/sys v0.0.0-20220513210249-45d2b4557a2a // indirect
+	golang.org/x/sys v0.0.0-20220520151302-bc2c85ada10a // indirect
 )
