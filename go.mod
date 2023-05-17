@@ -4,7 +4,7 @@ go 1.20
 
 require (
 	github.com/csmith/envflag v1.0.0
-	github.com/google/go-containerregistry v0.15.1
+	github.com/google/go-containerregistry v0.15.2
 	github.com/greboid/golog v1.0.4
 	golang.org/x/time v0.3.0
 	gopkg.in/yaml.v2 v2.4.0
